@@ -1,9 +1,10 @@
 /**
- * 🌸 Flower Card – Smart Home Tom
+ * 🌸 Flower Card – Smart Home Tom V2
  * Eine eigenständige Lovelace Custom Card für Pflanzensensoren.
  * Zeigt Bodenfeuchte, Temperatur, Licht und EC mit farbigen Balken.
  *
- * Repo: https://github.com/maler-tom/flower-card
+ * Repo: https://github.com/maler-tom/flower-card-by-smart-home-tom-v2
+ *
  * Konfiguration:
  *   type: custom:flower-card
  *   plant_name: "Meine Pflanze"
@@ -17,11 +18,13 @@
  *   temp_max: 40         # Maximalwert Temperatur (Standard: 40)
  *   lux_max: 10000       # Maximalwert Licht (Standard: 10000)
  *   ec_max: 2000         # Maximalwert EC (Standard: 2000)
+ *
  *   soil_warn_low: 30    # Warnschwelle zu trocken (Standard: 30)
  *   soil_warn_high: 80   # Warnschwelle zu nass (Standard: 80)
  *   ec_warn_low: 300     # Warnschwelle zu wenig Dünger (Standard: 300)
  *   ec_warn_high: 1200   # Warnschwelle zu viel Dünger (Standard: 1200)
  */
+
 
 const VERSION = "1.0.0";
 
@@ -32,7 +35,7 @@ window.customCards.push({
   name: "Flower Card – Smart Home Tom",
   description: "Pflanzenkarte mit Bodenfeuchte, Temperatur, Licht und EC – by Smart Home Tom",
   preview: false,
-  documentationURL: "https://github.com/maler-tom/flower-card",
+  documentationURL: "https://github.com/maler-tom/flower-card-by-smart-home-tom-v2",
 });
 
 class FlowerCard extends HTMLElement {
