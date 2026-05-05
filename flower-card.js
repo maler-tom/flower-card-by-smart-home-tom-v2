@@ -32,10 +32,8 @@ const VERSION = "1.0.0";
 window.customCards = window.customCards || [];
 window.customCards.push({
   type: "flower-card",
-  name: "Flower Card – Smart Home Tom",
-  description: "Pflanzenkarte mit Bodenfeuchte, Temperatur, Licht und EC – by Smart Home Tom",
-  preview: false,
-  documentationURL: "https://github.com/maler-tom/flower-card-by-smart-home-tom-v2",
+  name: "Flower Card",
+  description: "Beautiful plant monitoring card with smart status display"
 });
 
 class FlowerCard extends HTMLElement {
