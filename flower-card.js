@@ -11,14 +11,13 @@
  * Optional:
  *   display_type: full        # full (Standard) oder compact
  *   battery_sensor: sensor.x  # Batterie-Sensor
- *   hide_image: false          # Pflanzenbild ausblenden
  *   hide_species: false        # Pflanzenart ausblenden
  *   show_bars:                 # Welche Balken anzeigen
- *     - moisture
+ *     - soil_moisture
  *     - temperature
  *     - illuminance
  *     - conductivity
- *     - humidity
+ *     - air_humidity
  *   extra_badges:              # Zusätzliche Badges
  *     - entity: sensor.x
  */
@@ -35,19 +34,22 @@ window.customCards.push({
 });
 
 // -------------------------------------------------------------------
-// Hilfsfunktionen
+// Balken Konfiguration
 // -------------------------------------------------------------------
 const BAR_CONFIG = {
-  moisture:       { label: "🌱 Boden",   unit: "%",    color: "#7CFC00", attr: "moisture",       min_attr: "min_moisture",       max_attr: "max_moisture"       },
-  temperature:    { label: "🌡 Temp",    unit: "°C",   color: "#4db8ff", attr: "temperature",    min_attr: "min_temperature",    max_attr: "max_temperature"    },
-  illuminance:    { label: "☀️ Licht",   unit: " lx",  color: "#ffa64d", attr: "illuminance",    min_attr: "min_illuminance",    max_attr: "max_illuminance"    },
-  conductivity:   { label: "⚡ EC",      unit: " µS",  color: "#b07cff", attr: "conductivity",   min_attr: "min_conductivity",   max_attr: "max_conductivity"   },
-  humidity:       { label: "💧 Luft",    unit: "%",    color: "#00bfff", attr: "humidity",       min_attr: "min_humidity",       max_attr: "max_humidity"       },
-  dli:            { label: "🌞 DLI",     unit: " mol", color: "#ffdd57", attr: "dli",            min_attr: "min_dli",            max_attr: "max_dli"            },
+  soil_moisture: { label: "🌱 Boden",  unit: "%",    color: "#7CFC00" },
+  temperature:   { label: "🌡 Temp",   unit: "°C",   color: "#4db8ff" },
+  illuminance:   { label: "☀️ Licht",  unit: " lx",  color: "#ffa64d" },
+  conductivity:  { label: "⚡ EC",     unit: " µS",  color: "#b07cff" },
+  air_humidity:  { label: "💧 Luft",   unit: "%",    color: "#00bfff" },
+  ppfd_mol:      { label: "🌞 PPFD",   unit: " mol", color: "#ffdd57" },
 };
 
-const DEFAULT_BARS = ["moisture", "temperature", "illuminance", "conductivity"];
+const DEFAULT_BARS = ["soil_moisture", "temperature", "illuminance", "conductivity", "air_humidity"];
 
+// -------------------------------------------------------------------
+// Haupt Card
+// -------------------------------------------------------------------
 class FlowerCard extends HTMLElement {
   constructor() {
     super();
@@ -75,7 +77,6 @@ class FlowerCard extends HTMLElement {
       entity:         config.entity,
       display_type:   config.display_type   || "full",
       battery_sensor: config.battery_sensor || null,
-      hide_image:     config.hide_image     ?? false,
       hide_species:   config.hide_species   ?? false,
       show_bars:      config.show_bars      || DEFAULT_BARS,
       extra_badges:   config.extra_badges   || [],
@@ -89,7 +90,6 @@ class FlowerCard extends HTMLElement {
     return { entity: "plant.meine_pflanze" };
   }
 
-  // GUI Editor
   static getConfigElement() {
     return document.createElement("flower-card-editor");
   }
@@ -120,26 +120,14 @@ class FlowerCard extends HTMLElement {
             gap: 14px;
             margin-bottom: 12px;
           }
-          .fc-image {
-            width: 56px;
-            height: 56px;
-            border-radius: 50%;
-            object-fit: cover;
-            border: 2px solid rgba(255,255,255,0.3);
-            background: rgba(255,255,255,0.1);
+          .fc-icon {
+            font-size: 2.8em;
+            line-height: 1;
             flex-shrink: 0;
+            transition: all 0.5s ease;
           }
-          .fc-image-placeholder {
-            width: 56px;
-            height: 56px;
-            border-radius: 50%;
-            background: rgba(255,255,255,0.1);
-            border: 2px solid rgba(255,255,255,0.3);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 28px;
-            flex-shrink: 0;
+          .fc-wrap.compact .fc-icon {
+            font-size: 2em;
           }
           .fc-header-info {
             flex: 1;
@@ -153,6 +141,7 @@ class FlowerCard extends HTMLElement {
             overflow: hidden;
             text-overflow: ellipsis;
           }
+          .fc-wrap.compact .fc-name { font-size: 14px; }
           .fc-species {
             font-size: 12px;
             opacity: 0.65;
@@ -174,8 +163,9 @@ class FlowerCard extends HTMLElement {
           /* BADGES */
           .fc-badges {
             display: flex;
-            gap: 7px;
-            align-items: center;
+            flex-direction: column;
+            gap: 5px;
+            align-items: flex-end;
             flex-shrink: 0;
           }
           .fc-badge {
@@ -194,12 +184,15 @@ class FlowerCard extends HTMLElement {
             gap: 3px;
             font-size: 12px;
             font-weight: 600;
+            background: rgba(255,255,255,0.12);
+            border-radius: 20px;
+            padding: 3px 8px;
           }
           /* BARS */
           .fc-divider {
             border: none;
             border-top: 1px solid rgba(255,255,255,0.12);
-            margin: 12px 0 12px;
+            margin: 12px 0;
           }
           .fc-bars { text-align: left; }
           .fc-bars.compact {
@@ -239,27 +232,10 @@ class FlowerCard extends HTMLElement {
             border-radius: 10px;
             transition: width 0.6s cubic-bezier(0.4,0,0.2,1);
           }
-          /* Warnschwellen Marker */
-          .fc-bar-min, .fc-bar-max {
-            position: absolute;
-            top: 0;
-            width: 2px;
-            height: 100%;
-            background: rgba(255,255,255,0.5);
-            border-radius: 2px;
-          }
-          /* Compact header */
-          .fc-wrap.compact .fc-image,
-          .fc-wrap.compact .fc-image-placeholder { width: 40px; height: 40px; font-size: 20px; }
-          .fc-wrap.compact .fc-name { font-size: 14px; }
-          .fc-wrap.compact .fc-species { font-size: 11px; }
         </style>
         <div class="fc-wrap" id="fc-wrap">
-          <!-- HEADER -->
           <div class="fc-header">
-            <div id="fc-img-wrap">
-              <div class="fc-image-placeholder">🌸</div>
-            </div>
+            <div class="fc-icon" id="fc-icon">🌸</div>
             <div class="fc-header-info">
               <div class="fc-name" id="fc-name">Pflanze</div>
               <div class="fc-species" id="fc-species"></div>
@@ -275,38 +251,80 @@ class FlowerCard extends HTMLElement {
   }
 
   // -------------------------------------------------------------------
+  // Sensor Entity ID aus Plant Entity ableiten
+  // -------------------------------------------------------------------
+  _getSensorId(plantId, suffix) {
+    // plant.zwergh_blattfahn → sensor.zwergh_blattfahn_soil_moisture
+    const name = plantId.replace("plant.", "");
+    return `sensor.${name}_${suffix}`;
+  }
+
+  // -------------------------------------------------------------------
   // Update
   // -------------------------------------------------------------------
   _update() {
     if (!this._hass || !this._config) return;
 
     const cfg = this._config;
-    const state = this._hass.states[cfg.entity];
+    const plantState = this._hass.states[cfg.entity];
 
-    if (!state) {
+    if (!plantState) {
       this.querySelector("#fc-name").textContent = cfg.entity;
       this.querySelector("#fc-status").textContent = "⚠️ Entity nicht gefunden";
       return;
     }
 
-    const attrs = state.attributes;
+    const attrs = plantState.attributes;
     const isCompact = cfg.display_type === "compact";
 
     // Compact Mode
-    const wrap = this.querySelector("#fc-wrap");
-    wrap.className = `fc-wrap${isCompact ? " compact" : ""}`;
+    this.querySelector("#fc-wrap").className = `fc-wrap${isCompact ? " compact" : ""}`;
 
-    // Bild
-    const imgWrap = this.querySelector("#fc-img-wrap");
-    if (!cfg.hide_image && attrs.entity_picture) {
-      imgWrap.innerHTML = `<img class="fc-image" src="${attrs.entity_picture}" alt="plant">`;
-    } else {
-      const icon = this._getIcon(attrs);
-      imgWrap.innerHTML = `<div class="fc-image-placeholder">${icon}</div>`;
+    // Sensoren auslesen
+    const sensors = {};
+    for (const key of Object.keys(BAR_CONFIG)) {
+      const entityId = this._getSensorId(cfg.entity, key);
+      const state = this._hass.states[entityId];
+      sensors[key] = state ? parseFloat(state.state) : null;
+      // Min/Max aus Sensor Attributen
+      if (state) {
+        sensors[`${key}_min`] = parseFloat(state.attributes.min) || null;
+        sensors[`${key}_max`] = parseFloat(state.attributes.max) || null;
+      }
     }
 
-    // Name & Species
+    // Icon je nach Bodenfeuchtigkeit
+    const moisture = sensors["soil_moisture"];
+    let icon = "🌸";
+    if (moisture === null || isNaN(moisture)) icon = "❓";
+    else if (moisture < 20)  icon = "🥀";
+    else if (moisture < 35)  icon = "🌼";
+    else if (moisture > 80)  icon = "💧";
+    else                     icon = "🌸";
+
+    // Status
+    let status = "🟢 Alles OK";
+    const checks = [
+      { key: "soil_moisture",  low: "💧 Gießen empfohlen",   high: "🚨 Zu nass!",         lowVal: 20, highVal: 80 },
+      { key: "conductivity",   low: "⚡ Düngen empfohlen",   high: "🚨 Zu viel Dünger!",  lowVal: 100, highVal: 2000 },
+      { key: "temperature",    low: "🥶 Zu kalt!",           high: "🔥 Zu warm!",          lowVal: 10, highVal: 35 },
+      { key: "illuminance",    low: "🌑 Zu dunkel!",         high: "☀️ Zu hell!",          lowVal: 500, highVal: 50000 },
+    ];
+
+    for (const c of checks) {
+      const v = sensors[c.key];
+      if (v === null || isNaN(v)) continue;
+      const min = sensors[`${c.key}_min`] || c.lowVal;
+      const max = sensors[`${c.key}_max`] || c.highVal;
+      if (v < min) { status = c.low; break; }
+      if (v > max) { status = c.high; break; }
+    }
+
+    // DOM Updates
+    this.querySelector("#fc-icon").textContent = icon;
     this.querySelector("#fc-name").textContent = attrs.friendly_name || cfg.entity;
+
+    // Species
     const speciesEl = this.querySelector("#fc-species");
     if (!cfg.hide_species && attrs.species) {
       speciesEl.textContent = attrs.species;
@@ -315,45 +333,16 @@ class FlowerCard extends HTMLElement {
       speciesEl.style.display = "none";
     }
 
-    // Status
-    const status = this._getStatus(attrs);
     this.querySelector("#fc-status").textContent = status;
 
     // Badges
-    this._renderBadges(attrs);
+    this._renderBadges();
 
     // Bars
-    this._renderBars(attrs, isCompact);
+    this._renderBars(sensors, isCompact);
   }
 
-  _getIcon(attrs) {
-    const moisture = parseFloat(attrs.moisture);
-    if (isNaN(moisture)) return "❓";
-    const min = parseFloat(attrs.min_moisture) || 30;
-    const max = parseFloat(attrs.max_moisture) || 80;
-    if (moisture < min) return "🥀";
-    if (moisture < min + 10) return "🌼";
-    if (moisture > max) return "💧";
-    return "🌸";
-  }
-
-  _getStatus(attrs) {
-    const checks = [
-      { val: attrs.moisture,     min: attrs.min_moisture,     max: attrs.max_moisture,     low: "💧 Gießen empfohlen",        high: "🚨 Zu nass!" },
-      { val: attrs.conductivity, min: attrs.min_conductivity, max: attrs.max_conductivity, low: "⚡ Düngen empfohlen",          high: "🚨 Zu viel Dünger!" },
-      { val: attrs.temperature,  min: attrs.min_temperature,  max: attrs.max_temperature,  low: "🥶 Zu kalt!",                 high: "🔥 Zu warm!" },
-      { val: attrs.illuminance,  min: attrs.min_illuminance,  max: attrs.max_illuminance,  low: "🌑 Zu dunkel!",               high: "☀️ Zu hell!" },
-    ];
-    for (const c of checks) {
-      const v = parseFloat(c.val);
-      if (isNaN(v)) continue;
-      if (c.min && v < parseFloat(c.min)) return c.low;
-      if (c.max && v > parseFloat(c.max)) return c.high;
-    }
-    return "🟢 Alles OK";
-  }
-
-  _renderBadges(attrs) {
+  _renderBadges() {
     const cfg = this._config;
     let html = "";
 
@@ -372,49 +361,59 @@ class FlowerCard extends HTMLElement {
     for (const badge of cfg.extra_badges) {
       const s = this._hass.states[badge.entity];
       if (!s) continue;
-      const val = s.state;
       const unit = s.attributes.unit_of_measurement || "";
-      html += `<span class="fc-badge">${val}${unit}</span>`;
+      html += `<span class="fc-badge">${s.state}${unit}</span>`;
     }
 
     this.querySelector("#fc-badges").innerHTML = html;
   }
 
-  _renderBars(attrs, isCompact) {
+  _renderBars(sensors, isCompact) {
     const cfg = this._config;
     const barsEl = this.querySelector("#fc-bars");
     barsEl.className = `fc-bars${isCompact ? " compact" : ""}`;
 
-    const bars = cfg.show_bars
+    // Standardmäßige Max-Werte wenn keine Min/Max in Sensoren
+    const defaults = {
+      soil_moisture: { max: 100 },
+      temperature:   { max: 40  },
+      illuminance:   { max: 10000 },
+      conductivity:  { max: 2000 },
+      air_humidity:  { max: 100 },
+      ppfd_mol:      { max: 100 },
+    };
+
+    barsEl.innerHTML = cfg.show_bars
       .filter(key => BAR_CONFIG[key])
       .map(key => {
         const bc = BAR_CONFIG[key];
-        const val = parseFloat(attrs[bc.attr]);
-        const minVal = parseFloat(attrs[bc.min_attr]) || 0;
-        const maxVal = parseFloat(attrs[bc.max_attr]) || 100;
-        const pct = isNaN(val) ? 0 : Math.max(0, Math.min(100, (val / maxVal) * 100)).toFixed(1);
-        const minPct = ((minVal / maxVal) * 100).toFixed(1);
+        const val = sensors[key];
+        const maxVal = sensors[`${key}_max`] || defaults[key]?.max || 100;
+        const minVal = sensors[`${key}_min`] || 0;
 
-        // Farbe je nach Status
+        const pct = (val === null || isNaN(val))
+          ? 0
+          : Math.max(0, Math.min(100, (val / maxVal) * 100)).toFixed(1);
+
+        // Balkenfarbe: rot wenn außerhalb Schwelle
         let color = bc.color;
-        if (!isNaN(val)) {
-          if (val < minVal) color = "#ff4444";
-          else if (val > maxVal) color = "#ff4444";
+        if (val !== null && !isNaN(val)) {
+          if (val < minVal || val > maxVal) color = "#ff4444";
         }
+
+        const displayVal = (val === null || isNaN(val)) ? "–" : val;
+        const displayUnit = (val === null || isNaN(val)) ? "" : bc.unit;
 
         return `
           <div class="fc-row">
             <div class="fc-label">${bc.label}</div>
             <div class="fc-bar-bg">
               <div class="fc-bar-fill" style="width:${pct}%;background:${color};"></div>
-              <div class="fc-bar-min" style="left:${minPct}%;"></div>
             </div>
-            <div class="fc-val">${isNaN(val) ? "–" : val}${isNaN(val) ? "" : bc.unit}</div>
+            <div class="fc-val">${displayVal}${displayUnit}</div>
           </div>
         `;
-      });
-
-    barsEl.innerHTML = bars.join("");
+      }).join("");
   }
 }
 
@@ -430,6 +429,7 @@ class FlowerCardEditor extends HTMLElement {
 
   set hass(hass) {
     this._hass = hass;
+    this._render();
   }
 
   setConfig(config) {
@@ -440,12 +440,10 @@ class FlowerCardEditor extends HTMLElement {
   _render() {
     if (!this._hass) return;
 
-    // Alle Plant Entities
     const plants = Object.keys(this._hass.states)
       .filter(id => id.startsWith("plant."))
       .sort();
 
-    // Alle Sensoren
     const sensors = Object.keys(this._hass.states)
       .filter(id => id.startsWith("sensor."))
       .sort();
@@ -465,7 +463,7 @@ class FlowerCardEditor extends HTMLElement {
           font-weight: 600;
           opacity: 0.8;
         }
-        .editor-select, .editor-input {
+        .editor-select {
           padding: 8px 10px;
           border-radius: 8px;
           border: 1px solid var(--divider-color);
@@ -479,6 +477,7 @@ class FlowerCardEditor extends HTMLElement {
           display: flex;
           align-items: center;
           gap: 10px;
+          font-weight: normal;
         }
       </style>
 
@@ -492,7 +491,7 @@ class FlowerCardEditor extends HTMLElement {
       <div class="editor-row">
         <div class="editor-label">🖼️ Anzeigemodus</div>
         <select class="editor-select" id="display_type">
-          <option value="full" ${(cfg.display_type||"full") === "full" ? "selected" : ""}>Full</option>
+          <option value="full"    ${(cfg.display_type || "full") === "full"    ? "selected" : ""}>Full</option>
           <option value="compact" ${cfg.display_type === "compact" ? "selected" : ""}>Compact</option>
         </select>
       </div>
@@ -506,38 +505,29 @@ class FlowerCardEditor extends HTMLElement {
       </div>
 
       <div class="editor-row">
-        <div class="editor-label editor-toggle">
-          <input type="checkbox" id="hide_image" ${cfg.hide_image ? "checked" : ""}>
-          Pflanzenbild ausblenden
-        </div>
-      </div>
-
-      <div class="editor-row">
-        <div class="editor-label editor-toggle">
+        <label class="editor-toggle">
           <input type="checkbox" id="hide_species" ${cfg.hide_species ? "checked" : ""}>
           Pflanzenart ausblenden
-        </div>
+        </label>
       </div>
     `;
 
-    // Events
     this.querySelectorAll("select, input").forEach(el => {
       el.addEventListener("change", () => this._valueChanged());
     });
   }
 
   _valueChanged() {
-    const newConfig = {
-      ...this._config,
-      entity:         this.querySelector("#entity").value,
-      display_type:   this.querySelector("#display_type").value,
-      battery_sensor: this.querySelector("#battery_sensor").value || null,
-      hide_image:     this.querySelector("#hide_image").checked,
-      hide_species:   this.querySelector("#hide_species").checked,
-    };
-
     const event = new CustomEvent("config-changed", {
-      detail: { config: newConfig },
+      detail: {
+        config: {
+          ...this._config,
+          entity:         this.querySelector("#entity").value,
+          display_type:   this.querySelector("#display_type").value,
+          battery_sensor: this.querySelector("#battery_sensor").value || null,
+          hide_species:   this.querySelector("#hide_species").checked,
+        }
+      },
       bubbles: true,
       composed: true,
     });
